@@ -1,0 +1,5 @@
+embedding_model: text-embedding-3-small
+llm_model: gpt-4o-mini
+chunk_size: 800
+chunk_overlap: 100
+k_retrieval: 4
