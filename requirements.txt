@@ -1,5 +1,24 @@
-streamlit>=1.35.0,<2.0.0
-langchain>=0.2.0,<1.0.0
-chromadb>=0.5.0,<1.0.0
-pypdf>=4.2.0,<6.0.0
-pyyaml>=6.0.1,<7.0.0
+# Core - versions compatibles (testées ensemble)
+langchain==0.2.0
+langchain-community==0.2.0
+langchain-openai==0.1.7
+
+# UI
+streamlit==1.32.0
+
+# Vector Store (Windows-friendly, pas besoin de compilateur C++)
+faiss-cpu==1.8.0
+
+# Embeddings
+sentence-transformers==2.7.0
+
+# Documents
+pypdf==4.1.0
+python-dotenv==1.0.1
+pyyaml==6.0.1
+
+# Client OpenAI (pour l'API compatible d'Ollama)
+openai==1.30.0
+
+# Évaluation (optionnel pour plus tard)
+datasets==2.19.0

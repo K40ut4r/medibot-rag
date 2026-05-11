@@ -1,5 +1,13 @@
-embedding_model: text-embedding-3-small
-llm_model: gpt-4o-mini
-chunk_size: 800
-chunk_overlap: 100
-k_retrieval: 4
+rag:
+  chunk_size: 512
+  chunk_overlap: 100
+  top_k: 3
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  
+llm:
+  model: "phi3:mini"
+  temperature: 0.1
+  
+paths:
+  pdf_dir: "data/raw"
+  faiss_index: "data/faiss_index"

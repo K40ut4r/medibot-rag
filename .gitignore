@@ -1,17 +1,26 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.so
-.venv/
+.Python
 venv/
-.env
+env/
+ENV/
 
-# Data files
-*.pdf
+# Data (ne pas versionner les PDFs et la base)
+data/raw/*.pdf
+data/faiss_index/
 
-# Vector store artifacts
-data/chroma_db/*
-!data/chroma_db/.gitkeep
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Jupyter
-.ipynb_checkpoints/
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
