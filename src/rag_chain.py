@@ -1,53 +1,74 @@
 from langchain_community.llms import Ollama
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableLambda
 from src.vector_store import load_vector_store
 import yaml
 
-MEDICAL_PROMPT = """Tu es un assistant médical intelligent. Tu réponds UNIQUEMENT à partir du contexte médical fourni.
-Si tu ne trouves pas la réponse dans le contexte, dis "Je ne dispose pas d'informations suffisantes dans ma base de connaissances pour répondre à cette question."
+MEDICAL_PROMPT = """<|system|>
+Tu es un assistant médical. Réponds UNIQUEMENT à la question posée en te basant sur le contexte fourni. 
+Ne répète JAMAIS le contexte dans ta réponse. Synthétise les informations en une réponse claire.
+</|system|>
 
-Contexte médical :
+<|context|>
 {context}
+</|context|>
 
-Question du patient : {question}
+<|user|>
+{question}
+</|user|>
 
-Instructions :
-1. Réponds de manière claire et structurée
-2. Cite les sources entre crochets [source: nom_du_document]
-3. Ajoute TOUJOURS un avertissement médical à la fin
-4. Si c'est une urgence potentielle, conseille de consulter immédiatement
+<|assistant|>
+"""
 
-Réponse :"""
+
+def format_docs(docs):
+    if not docs:
+        return "Aucun document pertinent trouvé."
+    formatted = []
+    for i, doc in enumerate(docs):
+        source = doc.metadata.get("source", "Inconnu")
+        formatted.append(f"[Source {i+1}: {source}]\n{doc.page_content}")
+    return "\n\n---\n\n".join(formatted)
+
 
 def build_rag_chain(config_path: str = "config.yaml"):
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
-    
+
     print("🔍 Chargement de la base vectorielle...")
     vectordb = load_vector_store(
         config['paths']['faiss_index'],
         config['rag']['model_name']
     )
-    
+
     print("🤖 Connexion à Ollama...")
     llm = Ollama(
         model=config['llm']['model'],
         temperature=config['llm']['temperature'],
         base_url="http://localhost:11434"
     )
-    
+
     prompt = PromptTemplate(
         template=MEDICAL_PROMPT,
         input_variables=["context", "question"]
     )
-    
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vectordb.as_retriever(search_kwargs={"k": config['rag']['top_k']}),
-        return_source_documents=True,
-        chain_type_kwargs={"prompt": prompt}
+
+    # ✅ Retriever simple et stable (sans score_threshold capricieux)
+    retriever = vectordb.as_retriever(
+        search_kwargs={"k": config['rag']['top_k']}
     )
-    
-    return qa_chain
+
+    def retrieve_and_run(question: str) -> dict:
+        docs = retriever.invoke(question)
+        context = format_docs(docs)
+        
+        chain = prompt | llm | StrOutputParser()
+        answer = chain.invoke({"context": context, "question": question})
+        
+        return {
+            "answer": answer,
+            "source_documents": docs
+        }
+
+    return RunnableLambda(retrieve_and_run)
