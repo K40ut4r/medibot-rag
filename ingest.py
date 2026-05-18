@@ -12,8 +12,16 @@ def main():
     print(f"✅ {len(docs)} pages chargées")
     
     print("✂️ Chunking...")
-    chunks = split_documents(docs, config['rag']['chunk_size'], config['rag']['chunk_overlap'])
+    chunks = split_documents(
+        docs, 
+        config['rag']['chunk_size'], 
+        config['rag']['chunk_overlap']
+    )
     print(f"✅ {len(chunks)} chunks créés")
+    
+    # Vérification : affiche un exemple de métadonnées
+    if chunks:
+        print(f"   📎 Exemple metadata : {chunks[0].metadata}")
     
     print("🧠 Création de la base vectorielle FAISS...")
     create_vector_store(chunks, config['paths']['faiss_index'], config['rag']['model_name'])

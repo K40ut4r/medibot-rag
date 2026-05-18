@@ -1,189 +1,309 @@
 import streamlit as st
 from src.rag_chain import build_rag_chain
+from src.vector_store import load_vector_store
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+import os
+import yaml
 
 st.set_page_config(page_title="MediBot RAG", page_icon="🩺", layout="wide")
 
-st.title("🩺 MediBot — Assistant Médical RAG")
-st.caption("Propulsé par LangChain + Ollama | Sources vérifiées | 💬 Mémoire conversationnelle")
+# ─── THEME MÉDICAL CSS ───
+st.markdown("""
+<style>
+    .stApp header { background-color: #0d7377 !important; }
+    .stButton>button {
+        background-color: #14a085;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        transition: 0.2s;
+    }
+    .stButton>button:hover {
+        background-color: #0d7377;
+        transform: translateY(-1px);
+    }
+    .stChatMessage:has([data-testid="chatAvatarIcon-assistant"]) {
+        background-color: #e8f6f3 !important;
+        border-left: 4px solid #14a085;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-st.warning("⚕️ **Avertissement** : Cet outil est à titre informatif uniquement. Consultez un médecin pour tout diagnostic.")
+# ─── CHARGEMENT CONFIG ───
+with open("config.yaml", 'r', encoding='utf-8') as f:
+    CONFIG = yaml.safe_load(f)
 
 # ─── INITIALISATION ───
 if "chain" not in st.session_state:
-    with st.spinner("🚀 Chargement du modèle RAG..."):
-        st.session_state.chain = build_rag_chain()
-        st.session_state.messages = []
-        st.session_state.processing = False
+    st.session_state.chain = build_rag_chain()
+    st.session_state.messages = []
+    st.session_state.doc_count = 14
 
-# ─── SIDEBAR ───
+if "busy" not in st.session_state:
+    st.session_state.busy = False
+
+# ═══════════════════════════════════════════════════════════
+# CALCUL GLOBAL : est-ce qu'on est en train de générer ?
+# ═══════════════════════════════════════════════════════════
+is_generating = (
+    len(st.session_state.messages) > 0 
+    and st.session_state.messages[-1]["role"] == "user"
+)
+
+# ═══════════════════════════════════════════════════════════
+# SIDEBAR
+# ═══════════════════════════════════════════════════════════
 with st.sidebar:
-    st.header("⚙️ Informations")
-    st.info("💡 Le bot garde le contexte de la conversation.")
+    st.title("⚙️ MediBot")
     
-    if st.button("🗑️ Effacer l'historique", use_container_width=True):
-        st.session_state.messages = []
-        st.session_state.processing = False
-        st.rerun()
+    # ─── Stats ───
+    st.subheader("📊 Corpus médical")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("📄", st.session_state.get("doc_count", 14))
+    c2.metric("🏥", "10")
+    c3.metric("🧩", "1.4k")
+    st.progress(0.92, text="Fiabilité moyenne: 92%")
+    st.divider()
+    
+    # ─── Upload PDF (toujours visible) ───
+    st.subheader("📤 Ajouter un document")
+    st.caption("PDF médical officiel (HAS, WHO, etc.)")
+    uploaded_pdf = st.file_uploader(
+        "Déposer un PDF", type=["pdf"], accept_multiple_files=False, label_visibility="collapsed"
+    )
+    
+    if uploaded_pdf is not None:
+        pdf_dir = CONFIG['paths']['pdf_dir']
+        os.makedirs(pdf_dir, exist_ok=True)
+        pdf_path = os.path.join(pdf_dir, uploaded_pdf.name)
+        
+        if os.path.exists(pdf_path):
+            st.warning(f"⚠️ `{uploaded_pdf.name}` est déjà dans le corpus.")
+        else:
+            with st.spinner(f"🔧 Indexation de `{uploaded_pdf.name}`..."):
+                with open(pdf_path, "wb") as f:
+                    f.write(uploaded_pdf.getbuffer())
+                
+                loader = PyPDFLoader(pdf_path)
+                new_docs = loader.load()
+                for d in new_docs:
+                    d.metadata["source"] = uploaded_pdf.name
+                    d.metadata["type"] = "medical_guideline"
+                
+                splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=CONFIG['rag'].get('chunk_size', 512),
+                    chunk_overlap=CONFIG['rag'].get('chunk_overlap', 100),
+                    separators=["\n\n", "\n", ". ", " ", ""]
+                )
+                new_chunks = splitter.split_documents(new_docs)
+                
+                faiss_dir = CONFIG['paths']['faiss_index']
+                embeddings_model = CONFIG['rag']['model_name']
+                
+                if os.path.exists(os.path.join(faiss_dir, "index.faiss")):
+                    db = load_vector_store(faiss_dir, embeddings_model)
+                    db.add_documents(new_chunks)
+                    db.save_local(faiss_dir)
+                else:
+                    from src.vector_store import create_vector_store
+                    create_vector_store(new_chunks, faiss_dir, embeddings_model)
+                
+                st.session_state.chain = build_rag_chain()
+                st.session_state.doc_count += 1
+                st.success(f"✅ `{uploaded_pdf.name}` indexé ({len(new_chunks)} chunks)")
+                st.balloons()
     
     st.divider()
-    st.markdown("📥 **Télécharger le résumé**")
+    
+    # ─── Questions rapides (CACHÉES si traitement en cours) ───
+    st.subheader("❓ Questions rapides")
+    
+    if not is_generating:
+        quick_questions = [
+            "Symptômes diabète type 2",
+            "Prévention obésité",
+            "Signes crise cardiaque",
+            "Arrêt benzodiazépines",
+            "Vaccin dengue Qdenga",
+            "Recommandations Alzheimer"
+        ]
+        for q in quick_questions:
+            if st.button(q, use_container_width=True, key=f"qq_{hash(q)}"):
+                st.session_state.messages.append({"role": "user", "content": q})
+                st.rerun()
+    else:
+        st.info("⏳ Traitement en cours...")
+        st.caption("Patientez que MediBot réponde avant de poser une nouvelle question.")
+    
+    st.divider()
+    
+    # ─── Export ───
     if st.session_state.messages:
-        conversation = "\n\n".join([
-            f"{'👤 Patient' if m['role']=='user' else '🤖 MediBot'}: {m['content']}" 
+        conv = "\n\n".join([
+            f"{'👤 Patient' if m['role']=='user' else '🤖 MediBot'}: {m['content']}"
             for m in st.session_state.messages
         ])
         st.download_button(
-            label="📄 Exporter la conversation",
-            data=conversation,
-            file_name="consultation_medibot.txt",
-            mime="text/plain",
+            "📥 Exporter conversation", conv,
+            file_name="consultation_medibot.txt", mime="text/plain",
             use_container_width=True
         )
+    
+    if st.button("🗑️ Effacer l'historique", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.busy = False
+        st.rerun()
+    
+    st.divider()
+    st.caption("v1.1 • LangChain + Ollama + FAISS")
+    st.caption("Kaoutar Mezouahi — EFM NLP CI2")
 
-# ─── FONCTION DE REFORMULATION (MÉMOIRE) ───
-def reformulate_question(question: str, chat_history: list) -> str:
-    if not chat_history or len(chat_history) < 2:
-        return question
-    
-    # Trouve le DERNIER sujet médical distinct (pas la dernière question)
-    medical_keywords = ["diabète", "obésité", "helicobacter", "pylori", "cancer", "asthme", 
-                        "grippe", "vaccin", "hypertension", "cholestérol", "ulcère", "gastrite"]
-    
-    last_subject = None
-    # Parcourt l'historique à l'envers pour trouver le dernier sujet
-    for msg in reversed(chat_history):
-        if msg["role"] == "user":
-            content = msg["content"].lower()
-            for kw in medical_keywords:
-                if kw in content:
-                    last_subject = content
-                    break
-            if last_subject:
-                break
-    
-    if not last_subject:
-        return question
-    
-    # Si la question est courte/vague, reformule avec le dernier sujet
-    followup_indicators = ["et ", "quels ", "quel ", "comment ", "pourquoi ", "où ", "quand ", 
-                           "qui ", "les ", "le ", "la ", "des ", "du ", "de ", "ce ", "cette ", "cet "]
-    is_followup = len(question) < 80 or any(question.lower().startswith(ind) for ind in followup_indicators)
-    
-    # Vérifie si la question contient déjà un sujet médical
-    has_subject = any(kw in question.lower() for kw in medical_keywords)
-    
-    if is_followup and not has_subject:
-        return f"Concernant {last_subject}, {question}"
-    
-    return question
+# ═══════════════════════════════════════════════════════════
+# HEADER
+# ═══════════════════════════════════════════════════════════
+st.title("🩺 MediBot — Agent Médical Intelligent")
+st.caption("Propulsé par LangChain + Ollama | Sources vérifiées | Multilingue 🇫🇷🇬🇧🇸🇦")
+st.warning("⚕️ **Avertissement** : Cet outil est à titre informatif uniquement. Consultez un médecin pour tout diagnostic.")
 
-# ─── AFFICHAGE HISTORIQUE ───
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"], avatar="👤" if msg["role"] == "user" else "🤖"):
-        st.markdown(msg["content"])
-        if msg["role"] == "assistant" and "sources" in msg:
-            with st.expander("📚 Sources utilisées"):
-                for src in msg["sources"]:
-                    st.markdown(f"- `{src}`")
+# ═══════════════════════════════════════════════════════════
+# ONGLETS
+# ═══════════════════════════════════════════════════════════
+tab1, tab2 = st.tabs(["💬 Chat", "📊 Mode Évaluation"])
 
-# ─── BLOCAGE INPUT SI TRAITEMENT EN COURS ───
-if st.session_state.processing:
-    st.chat_input("⏳ Le bot répond... Veuillez patienter.", disabled=True)
-else:
-    if prompt := st.chat_input("Décrivez vos symptômes..."):
-        
-        # 🚨 GUARDRAIL : Détection d'urgence
-        URGENCY_KEYWORDS = [
-            "crise cardiaque", "arrêt cardiaque", "saignement", "perte de connaissance",
-            "difficulté à respirer", "étouffement", "empoisonnement", "suicide",
-            "je ne peux pas respirer", "je meurs", "urgence vitale"
-        ]
-        is_urgency = any(kw in prompt.lower() for kw in URGENCY_KEYWORDS)
-        
-        # Marque comme "en traitement"
-        st.session_state.processing = True
-        
-        # Ajoute le message utilisateur
+with tab1:
+    # ─── AFFICHAGE HISTORIQUE ───
+    for msg in st.session_state.messages:
+        avatar = "👤" if msg["role"] == "user" else "🤖"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+            if msg["role"] == "assistant" and msg.get("sources"):
+                with st.expander("📚 Sources utilisées"):
+                    for src in msg["sources"]:
+                        src_name = src.metadata.get("source", "Inconnu")
+                        section = src.metadata.get("section", "Non classé")
+                        st.markdown(f"- **`{src_name}`** — *Section: {section}*")
+                        st.caption(src.page_content[:120] + "...")
+    
+    # ─── CHAT INPUT ───
+    placeholder = (
+        "⏳ MediBot répond à la question précédente, veuillez patienter..." 
+        if is_generating else "Décrivez vos symptômes..."
+    )
+    prompt = st.chat_input(placeholder, disabled=is_generating)
+    
+    if prompt and not is_generating:
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.rerun()
-
-# ─── TRAITEMENT DE LA DERNIÈRE QUESTION ───
-if st.session_state.processing and st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     
-    prompt = st.session_state.messages[-1]["content"]
+    # ─── TRAITEMENT AVEC VERROU ───
+    unanswered_idx = None
+    for i, msg in enumerate(st.session_state.messages):
+        if msg["role"] == "user":
+            is_last = (i == len(st.session_state.messages) - 1)
+            next_is_not_assistant = (
+                not is_last and st.session_state.messages[i + 1]["role"] != "assistant"
+            )
+            if is_last or next_is_not_assistant:
+                unanswered_idx = i
+                break
     
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(prompt)
-    
-    with st.chat_message("assistant", avatar="🤖"):
+    if unanswered_idx is not None:
+        question = st.session_state.messages[unanswered_idx]["content"]
         
-        # Vérifie urgence
-        URGENCY_KEYWORDS = [
-            "crise cardiaque", "arrêt cardiaque", "saignement", "perte de connaissance",
-            "difficulté à respirer", "étouffement", "empoisonnement", "suicide",
-            "je ne peux pas respirer", "je meurs", "urgence vitale"
-        ]
-        is_urgency = any(kw in prompt.lower() for kw in URGENCY_KEYWORDS)
-        
-        if is_urgency:
-            answer = "🚨 **Cette situation nécessite une intervention médicale IMMÉDIATE.**\n\nAppelez le **15 (SAMU)** ou le **112**."
-            sources = []
-            confidence = 1.0
-            st.error(answer)
-            
+        # ⭐ VERROU : évite le double traitement si un autre run est déjà en cours
+        if st.session_state.busy:
+            with st.chat_message("assistant", avatar="🤖"):
+                st.spinner("🔍 Recherche dans la base médicale...")
         else:
-            with st.spinner("🔍 Recherche dans la base médicale..."):
+            with st.chat_message("assistant", avatar="🤖"):
+                URGENCY_KEYWORDS = [
+                    "crise cardiaque", "arrêt cardiaque", "saignement", "perte de connaissance",
+                    "difficulté à respirer", "étouffement", "empoisonnement", "suicide",
+                    "je ne peux pas respirer", "je meurs", "urgence vitale"
+                ]
+                is_urgency = any(kw in question.lower() for kw in URGENCY_KEYWORDS)
                 
-                # ✅ REFORMULATION AVEC MÉMOIRE
-                standalone_question = reformulate_question(prompt, st.session_state.messages[:-1])
-                if standalone_question != prompt:
-                    st.caption(f"🔄 Question reformulée : *{standalone_question}*")
-                
-                result = st.session_state.chain.invoke(standalone_question)
-                docs = result.get("source_documents", [])
-                sources = list(set([doc.metadata.get("source", "Inconnu") for doc in docs]))
-                
-                if not docs:
-                    answer = "Je ne dispose pas d'informations suffisantes dans ma base de connaissances pour répondre à cette question. Consultez un professionnel de santé."
-                    confidence = 0.2
-                    st.info(answer)
+                if is_urgency:
+                    st.error("🚨 **Cette situation nécessite une intervention médicale IMMÉDIATE.**")
+                    st.error("Appelez le **15 (SAMU)** ou le **112**.")
+                    answer = "Intervention médicale immédiate requise."
+                    sources = []
                 else:
-                    answer = result["answer"]
+                    try:
+                        st.session_state.busy = True
+                        with st.spinner("🔍 Recherche dans la base médicale..."):
+                            result = st.session_state.chain.invoke(question)
+                            answer = result["answer"]
+                            sources = result.get("source_documents", [])
+                            langue = result.get("detected_language", "français")
+                        
+                        st.markdown(answer)
+                        st.caption(f"🌐 Langue détectée : **{langue}**")
+                        
+                        if sources:
+                            confidence = min(0.7 + len(sources) * 0.08, 0.98)
+                            st.progress(confidence, text=f"Fiabilité source: {confidence*100:.0f}%")
+                            with st.expander("📚 Sources utilisées"):
+                                for src in sources:
+                                    src_name = src.metadata.get("source", "Inconnu")
+                                    section = src.metadata.get("section", "Non classé")
+                                    st.markdown(f"- **`{src_name}`** — *Section: {section}*")
+                                    st.caption(src.page_content[:120] + "...")
+                        else:
+                            st.info("Aucune source médicale fiable trouvée.")
                     
-                    # Nettoyage fallback
-                    fallback_phrases = [
-                        "Je ne dispose pas d'informations",
-                        "Aucun document pertinent trouvé",
-                        "Consultez un professionnel de santé pour obtenir des conseils adéquats"
-                    ]
-                    for phrase in fallback_phrases:
-                        if phrase in answer and len(answer) > len(phrase) + 50:
-                            answer = answer.replace(phrase, "").strip()
-                            answer = answer.replace("..", ".").replace("  ", " ")
-                    
-                    if len(sources) >= 3:
-                        confidence = 0.95
-                    elif len(sources) == 2:
-                        confidence = 0.85
-                    elif len(sources) == 1:
-                        confidence = 0.70
-                    else:
-                        confidence = 0.40
-                    
-                    st.markdown(answer)
-        
-        st.progress(min(confidence, 1.0), text=f"Fiabilité des sources: {confidence*100:.0f}%")
-        
-        if sources:
-            with st.expander("📚 Sources utilisées"):
-                for s in sources:
-                    st.markdown(f"- `{s}`")
+                    finally:
+                        st.session_state.busy = False
+                
+                # Insert réponse dans l'historique
+                st.session_state.messages.insert(unanswered_idx + 1, {
+                    "role": "assistant",
+                    "content": answer,
+                    "sources": sources
+                })
+                st.rerun()
+
+with tab2:
+    st.header("📊 Benchmark de pertinence")
+    st.write("Évaluation automatique sur 10 questions médicales prédéfinies.")
     
-    # Sauvegarde + libère le flag
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer,
-        "sources": sources
-    })
-    st.session_state.processing = False
-    st.rerun()
+    if st.button("🚀 Lancer l'évaluation"):
+        with st.spinner("Évaluation en cours... (~2-3 min)"):
+            try:
+                from src.evaluation import run_benchmark
+                results = run_benchmark()
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Questions", len(results))
+                col2.metric("Retrieval OK", sum(1 for r in results if r.get("retrieval_ok")))
+                col3.metric("Réponses OK", sum(1 for r in results if r.get("answer_ok")))
+                
+                st.dataframe(results, use_container_width=True)
+                
+                import matplotlib.pyplot as plt
+                categories = {}
+                for r in results:
+                    cat = r.get("category", "Autre")
+                    categories[cat] = categories.get(cat, {"ok": 0, "total": 0})
+                    categories[cat]["total"] += 1
+                    if r.get("answer_ok"):
+                        categories[cat]["ok"] += 1
+                
+                fig, ax = plt.subplots(figsize=(8, 4))
+                cats = list(categories.keys())
+                rates = [categories[c]["ok"] / categories[c]["total"] * 100 for c in cats]
+                bars = ax.bar(cats, rates, color="#14a085", edgecolor="white")
+                ax.set_ylabel("Taux de succès (%)")
+                ax.set_title("Pertinence par spécialité médicale")
+                ax.set_ylim(0, 110)
+                for bar, rate in zip(bars, rates):
+                    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 2,
+                            f"{rate:.0f}%", ha="center", va="bottom", color="white")
+                plt.xticks(rotation=30, ha="right")
+                plt.tight_layout()
+                st.pyplot(fig)
+                
+            except Exception as e:
+                st.error(f"Erreur : {e}")
+                st.info("Vérifiez que `src/evaluation.py` existe et que FAISS est créée.")

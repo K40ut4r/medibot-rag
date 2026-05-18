@@ -1,0 +1,122 @@
+[
+  {
+    "question": "Quels sont les symptômes du diabète de type 2 ?...",
+    "category": "Endocrinologie",
+    "langue": "français",
+    "retrieval_ok": true,
+    "answer_ok": false,
+    "sources_found": [
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf"
+    ]
+  },
+  {
+    "question": "What are the symptoms of type 2 diabetes?...",
+    "category": "Endocrinologie",
+    "langue": "anglais",
+    "retrieval_ok": true,
+    "answer_ok": true,
+    "sources_found": [
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf"
+    ]
+  },
+  {
+    "question": "ما هي أعراض السكري من النوع الثاني؟...",
+    "category": "Endocrinologie",
+    "langue": "arabe",
+    "retrieval_ok": true,
+    "answer_ok": true,
+    "sources_found": [
+      "fibromyalgia_in_adults_diagnostic_management_and_treatment_strategy_guidelinepdf.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "fiche_memo_arret_benzodiazepines_pour_mel_2015_06_16_en.pdf"
+    ]
+  },
+  {
+    "question": "Comment prévenir l'hypertension artérielle ?...",
+    "category": "Cardiologie",
+    "langue": "français",
+    "retrieval_ok": true,
+    "answer_ok": true,
+    "sources_found": [
+      "Hypertension and heart failure.pdf",
+      "Hypertension and heart failure.pdf",
+      "Hypertension and heart failure.pdf"
+    ]
+  },
+  {
+    "question": "Quels sont les effets secondaires du vaccin contre la grippe...",
+    "category": "Immunologie",
+    "langue": "français",
+    "retrieval_ok": false,
+    "answer_ok": false,
+    "sources_found": [
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf"
+    ]
+  },
+  {
+    "question": "Comment traiter un ulcère gastrique ?...",
+    "category": "Gastro-entérologie",
+    "langue": "français",
+    "retrieval_ok": false,
+    "answer_ok": false,
+    "sources_found": [
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "fibromyalgia_in_adults_diagnostic_management_and_treatment_strategy_guidelinepdf.pdf"
+    ]
+  },
+  {
+    "question": "Quels sont les signes d'un asthme chez l'enfant ?...",
+    "category": "Pédiatrie",
+    "langue": "français",
+    "retrieval_ok": false,
+    "answer_ok": false,
+    "sources_found": [
+      "recommandations-diagnostic-alzheimer.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "recommandations-diagnostic-alzheimer.pdf"
+    ]
+  },
+  {
+    "question": "What causes asthma in children?...",
+    "category": "Pédiatrie",
+    "langue": "anglais",
+    "retrieval_ok": false,
+    "answer_ok": false,
+    "sources_found": [
+      "asthma_follow-up_guidelines (1).pdf",
+      "asthma_follow-up_guidelines (1).pdf",
+      "asthma_follow-up_guidelines (1).pdf"
+    ]
+  },
+  {
+    "question": "Comment réduire le cholestérol LDL ?...",
+    "category": "Cardiologie",
+    "langue": "français",
+    "retrieval_ok": false,
+    "answer_ok": false,
+    "sources_found": [
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf",
+      "summary_has_care_pathway_guide_overweight_and_obesity_in_adults.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf"
+    ]
+  },
+  {
+    "question": "Quand consulter pour une douleur thoracique ?...",
+    "category": "Cardiologie",
+    "langue": "français",
+    "retrieval_ok": false,
+    "answer_ok": false,
+    "sources_found": [
+      "recommandations-diagnostic-alzheimer.pdf",
+      "recommandations-diagnostic-alzheimer.pdf",
+      "parcours_de_soins_du_patient_adulte_vivant_avec_un_diabete.pdf"
+    ]
+  }
+]

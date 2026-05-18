@@ -17,11 +17,11 @@ def evaluate_on_pubmedqa(n_samples: int = 50) -> Dict:
         question = item["question"]
         # Contexte PubMed = la réponse attendue
         try:
-            result = chain({"query": question})
+            result = chain.invoke(question)
             has_source = len(result.get("source_documents", [])) > 0
             results.append({
                 "question": question,
-                "has_answer": "Je ne dispose pas" not in result["result"],
+                "has_answer": "Je ne dispose pas" not in result["answer"],
                 "has_source": has_source
             })
         except Exception as e:

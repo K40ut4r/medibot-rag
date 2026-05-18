@@ -1,11 +1,11 @@
 rag:
-  chunk_size: 1024
-  chunk_overlap: 200
-  top_k: 2
+  chunk_size: 512        # Au lieu de 1024
+  chunk_overlap: 100     # Au lieu de 200
+  top_k: 3               # Au lieu de 5+
   model_name: "sentence-transformers/all-MiniLM-L6-v2"
-  
+
 llm:
-  model: "mistral"
+  model: "phi3:mini"     # Modèle léger
   temperature: 0.1
   
 paths:
