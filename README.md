@@ -7,9 +7,9 @@ MediBot est un agent conversationnel médical basé sur **RAG (Retrieval-Augment
 ## 🎯 Fonctionnalités
 
 - ✅ **RAG médical** : Réponses basées sur des PDFs médicaux officiels
-- ✅ **Mémoire conversationnelle** : Comprend les questions de suivi ("Et les risques ?")
 - ✅ **Citations de sources** : Chaque réponse indique le document PDF source
-- ✅ **Garde-fous sécurité** : Détection d'urgence + refus hors-sujet
+- ✅ **Garde-fous sécurité & Intentions** : Détection d'urgence + orientation pour prise de rdv
+- ✅ **Multilingue** : Détecte et répond en Français, Anglais ou Arabe
 - ✅ **LLM local** (Ollama) — 100% offline, confidentialité des données
 
 ## 🚀 Installation rapide
@@ -41,13 +41,21 @@ medibot-rag/
 ├── ingest.py                 # Script d'ingestion des PDFs
 ├── config.yaml               # Configuration (modèle, chunks, etc.)
 ├── requirements.txt
+├── evaluation_results.json   # Résultats des évaluations du modèle
 ├── README.md
+├── notebooks/
+│   └── 01_ingestion.ipynb    # Tests et expérimentations d'ingestion
 ├── src/
 │   ├── __init__.py
 │   ├── document_loader.py    # Extraction texte PDF
 │   ├── chunker.py            # Découpage en chunks
 │   ├── vector_store.py       # Base FAISS + embeddings
-│   └── rag_chain.py          # Chaîne RAG complète
+│   ├── rag_chain.py          # Chaîne RAG complète
+│   ├── agent_medibot.py      # Agent intelligent (mémoire et routing)
+│   ├── intent_detector.py    # Détection d'intentions médicales/urgences
+│   ├── evaluation.py         # Pipeline d'évaluation (RAGAS / LLM-as-a-judge)
+│   ├── evaluator.py          # Logique d'évaluation
+│   └── utils.py              # Fonctions utilitaires
 └── data/
     ├── raw/                  # PDFs source (non versionnés)
     └── faiss_index/          # Base vectorielle générée
