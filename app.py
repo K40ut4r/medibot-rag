@@ -1,5 +1,5 @@
 import streamlit as st
-from src.rag_chain import build_rag_chain
+from src.agent_medibot import MediBotAgent
 from src.vector_store import load_vector_store
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -35,8 +35,8 @@ with open("config.yaml", 'r', encoding='utf-8') as f:
     CONFIG = yaml.safe_load(f)
 
 # ─── INITIALISATION ───
-if "chain" not in st.session_state:
-    st.session_state.chain = build_rag_chain()
+if "agent" not in st.session_state:
+    st.session_state.agent = MediBotAgent()
     st.session_state.messages = []
     st.session_state.doc_count = 14
 
@@ -109,7 +109,7 @@ with st.sidebar:
                     from src.vector_store import create_vector_store
                     create_vector_store(new_chunks, faiss_dir, embeddings_model)
                 
-                st.session_state.chain = build_rag_chain()
+                st.session_state.agent = MediBotAgent()
                 st.session_state.doc_count += 1
                 st.success(f"✅ `{uploaded_pdf.name}` indexé ({len(new_chunks)} chunks)")
                 st.balloons()
@@ -217,44 +217,35 @@ with tab1:
                 st.spinner("🔍 Recherche dans la base médicale...")
         else:
             with st.chat_message("assistant", avatar="🤖"):
-                URGENCY_KEYWORDS = [
-                    "crise cardiaque", "arrêt cardiaque", "saignement", "perte de connaissance",
-                    "difficulté à respirer", "étouffement", "empoisonnement", "suicide",
-                    "je ne peux pas respirer", "je meurs", "urgence vitale"
-                ]
-                is_urgency = any(kw in question.lower() for kw in URGENCY_KEYWORDS)
-                
-                if is_urgency:
-                    st.error("🚨 **Cette situation nécessite une intervention médicale IMMÉDIATE.**")
-                    st.error("Appelez le **15 (SAMU)** ou le **112**.")
-                    answer = "Intervention médicale immédiate requise."
-                    sources = []
-                else:
-                    try:
-                        st.session_state.busy = True
-                        with st.spinner("🔍 Recherche dans la base médicale..."):
-                            result = st.session_state.chain.invoke(question)
-                            answer = result["answer"]
-                            sources = result.get("source_documents", [])
-                            langue = result.get("detected_language", "français")
+                try:
+                    st.session_state.busy = True
+                    with st.spinner("🤖 L'agent médical réfléchit..."):
+                        # Appel à l'agent
+                        result = st.session_state.agent.run(question)
+                        answer = result["answer"]
+                        sources = result.get("sources", [])
                         
-                        st.markdown(answer)
-                        st.caption(f"🌐 Langue détectée : **{langue}**")
-                        
-                        if sources:
-                            confidence = min(0.7 + len(sources) * 0.08, 0.98)
-                            st.progress(confidence, text=f"Fiabilité source: {confidence*100:.0f}%")
-                            with st.expander("📚 Sources utilisées"):
-                                for src in sources:
-                                    src_name = src.metadata.get("source", "Inconnu")
-                                    section = src.metadata.get("section", "Non classé")
-                                    st.markdown(f"- **`{src_name}`** — *Section: {section}*")
-                                    st.caption(src.page_content[:120] + "...")
+                        if result.get("is_emergency"):
+                            st.error(answer)
+                        elif result.get("suggested_action") == "open_app":
+                            st.info(answer)
                         else:
-                            st.info("Aucune source médicale fiable trouvée.")
+                            st.markdown(answer)
                     
-                    finally:
-                        st.session_state.busy = False
+                    if sources:
+                        confidence = min(0.7 + len(sources) * 0.08, 0.98)
+                        st.progress(confidence, text=f"Fiabilité source: {confidence*100:.0f}%")
+                        with st.expander("📚 Sources utilisées"):
+                            for src in sources:
+                                src_name = src.metadata.get("source", "Inconnu")
+                                section = src.metadata.get("section", "Non classé")
+                                st.markdown(f"- **`{src_name}`** — *Section: {section}*")
+                                st.caption(src.page_content[:120] + "...")
+                    elif not result.get("is_emergency") and not result.get("suggested_action") == "open_app":
+                        st.info("Aucune source médicale fiable trouvée.")
+                
+                finally:
+                    st.session_state.busy = False
                 
                 # Insert réponse dans l'historique
                 st.session_state.messages.insert(unanswered_idx + 1, {
